@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DiaryApp from './DiaryApp.jsx';
-import axios from 'axios'; // 引入Axios
+import axios from 'axios';
 
-// 邮件通知函数（不变）
 function trackPageVisit() {
   const currentPageUrl = window.location.href;
   const trackerUrl = 'https://mail.m-code.top/';
@@ -30,38 +29,30 @@ function App() {
   const [errorCount, setErrorCount] = useState(0);
   const [lockEndTime, setLockEndTime] = useState(0);
 
-  // 从localStorage读取状态（不变）
   useEffect(() => {
     const savedCount = localStorage.getItem('passwordErrorCount');
     const savedLockTime = localStorage.getItem('passwordLockEndTime');
-    const savedVerified = localStorage.getItem('passwordVerified');
     
     if (savedCount) setErrorCount(Number(savedCount));
     if (savedLockTime) setLockEndTime(Number(savedLockTime));
-    if (savedVerified === 'true') setVerified(true);
   }, []);
 
-  // 状态变化时保存到localStorage（不变）
   useEffect(() => {
     localStorage.setItem('passwordErrorCount', errorCount);
     localStorage.setItem('passwordLockEndTime', lockEndTime);
-    localStorage.setItem('passwordVerified', verified);
-  }, [errorCount, lockEndTime, verified]);
+  }, [errorCount, lockEndTime]);
 
-  // 检查是否处于锁定状态（不变）
   const isLocked = () => {
     const now = Date.now();
     return now < lockEndTime;
   };
 
-  // 计算剩余锁定时间（分钟）（不变）
   const getRemainingLockTime = () => {
     const now = Date.now();
     const remaining = Math.ceil((lockEndTime - now) / (1000 * 60));
     return remaining > 0 ? remaining : 0;
   };
 
-  // 关键修改：用Axios替代fetch发起POST请求（绝对路径）
   const handleVerify = async (e) => {
     e.preventDefault();
     const now = Date.now();
@@ -72,11 +63,10 @@ function App() {
     }
 
     try {
-      // Axios POST调用绝对路径API
       const response = await axios.post(
-        'https://diary.m-code.top/api/verifyPassword', // 绝对路径
-        { password }, // 请求体（密码参数）
-        { headers: { 'Content-Type': 'application/json' } } // 请求头
+        'https://diary.m-code.top/api/verifyPassword',
+        { password },
+        { headers: { 'Content-Type': 'application/json' } }
       );
 
       const data = response.data;
@@ -98,7 +88,6 @@ function App() {
         }
       }
     } catch (err) {
-      // Axios错误捕获（区分网络错误和接口错误）
       if (err.response) {
         setError(`接口错误：${err.response.statusText}`);
       } else if (err.request) {
@@ -110,7 +99,6 @@ function App() {
     }
   };
 
-  // 密码验证页面（不变）
   if (!verified) {
     return (
       <div style={{ maxWidth: 400, margin: '100px auto', padding: 20 }}>
