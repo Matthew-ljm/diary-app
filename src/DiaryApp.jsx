@@ -6,11 +6,7 @@ const BLUR_LENGTH = 100;
 
 function DiaryApp() {
   const supabase = getSupabaseClient();
-  const [diaries, setDiaries] = useState([]);
-  const [showDiaries, setShowDiaries] = useState([]); // 当前展示的分页日记uuid
-  const [showAll, setShowAll] = useState(false);
-  const [name, setName] = useState('');
-  const [content, setContent] = useState('');
+  const [diaries, setDiaries] = useState([]); // 当前已加载的日记
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -18,64 +14,98 @@ function DiaryApp() {
   const [expanded, setExpanded] = useState(null); // 当前展开的日记uuid
   const [fullContent, setFullContent] = useState(''); // 当前展开内容
   const [endReached, setEndReached] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const [name, setName] = useState('');
+  const [content, setContent] = useState('');
 
   const listRef = useRef(null);
+  const [totalCount, setTotalCount] = useState(null);
 
-  // 获取全部日记（仅一次，后续分页本地处理）
-  async function fetchAllDiaries() {
+  // 分页加载
+  async function fetchDiaries(offset = 0, append = false) {
+    if (showAll) return; // 若已经加载全部就不再分页
+    if (offset === 0) setEndReached(false);
+    const { data, error, count } = await supabase
+      .from('diary')
+      .select('uuid,created_at,name,left(content,100)::text as content', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (!error) {
+      setTotalCount(count);
+      if (append) {
+        setDiaries(prev => [...prev, ...data]);
+        if ((diaries.length + data.length) >= count) setEndReached(true);
+      } else {
+        setDiaries(data);
+        if (data.length >= count) setEndReached(true);
+      }
+      if (data.length < PAGE_SIZE) setEndReached(true);
+    } else {
+      setErrorMsg(error.message);
+    }
+  }
+
+  // 加载全部
+  async function handleLoadAll() {
     setLoading(true);
-    setEndReached(false);
+    setShowAll(true);
     const { data, error } = await supabase
       .from('diary')
-      .select('uuid,created_at,name,content')
+      .select('uuid,created_at,name,left(content,100)::text as content')
       .order('created_at', { ascending: false });
     if (!error) {
-      setDiaries(data || []);
-      if (data.length <= PAGE_SIZE) setEndReached(true);
-      setShowDiaries(data.slice(0, PAGE_SIZE).map(d => d.uuid));
+      setDiaries(data);
+      setEndReached(true);
     } else {
       setErrorMsg(error.message);
     }
     setLoading(false);
   }
 
+  // 首次加载10条
   useEffect(() => {
-    fetchAllDiaries();
+    setShowAll(false);
+    setDiaries([]);
+    fetchDiaries();
     // eslint-disable-next-line
   }, []);
 
-  // 加载更多
-  function handleLoadMore() {
-    if (loadingMore || endReached || showAll) return;
-    setLoadingMore(true);
-    setTimeout(() => {
-      const newLength = showDiaries.length + PAGE_SIZE;
-      setShowDiaries(diaries.slice(0, newLength).map(d => d.uuid));
-      if (newLength >= diaries.length) setEndReached(true);
-      setLoadingMore(false);
-    }, 0);
-  }
+  // 滚动到底加载更多
+  useEffect(() => {
+    if (showAll || endReached) return;
+    const handleScroll = () => {
+      if (!listRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
+      if (scrollTop + clientHeight >= scrollHeight - 40) {
+        if (!loadingMore && diaries.length % PAGE_SIZE === 0 && !endReached) {
+          setLoadingMore(true);
+          fetchDiaries(diaries.length, true).then(() => setLoadingMore(false));
+        }
+      }
+    };
+    const ref = listRef.current;
+    if (ref) ref.addEventListener('scroll', handleScroll);
+    return () => {
+      if (ref) ref.removeEventListener('scroll', handleScroll);
+    };
+    // eslint-disable-next-line
+  }, [diaries, showAll, endReached, loadingMore]);
 
-  // “加载全部”按钮
-  function handleLoadAll() {
-    setShowAll(true);
-    setShowDiaries(diaries.map(d => d.uuid));
-    setEndReached(true);
-  }
-
-  // 添加日记
+  // 添加新日记
   async function addDiary(e) {
     e.preventDefault();
     if (!name || !content) return;
     setErrorMsg('');
-    const { error } = await supabase.from('diary').insert([
-      { name, content }
-    ]);
+    const { error } = await supabase.from('diary').insert([{ name, content }]);
     if (!error) {
       setName('');
       setContent('');
       setSuccess(true);
-      await fetchAllDiaries();
+      setShowAll(false);
+      setDiaries([]);
+      await fetchDiaries();
       setTimeout(() => setSuccess(false), 1600);
     } else {
       setErrorMsg(error.message);
@@ -85,55 +115,26 @@ function DiaryApp() {
   // 删除日记
   async function deleteDiary(uuid) {
     await supabase.from('diary').delete().eq('uuid', uuid);
-    await fetchAllDiaries();
+    setShowAll(false);
+    setDiaries([]);
+    await fetchDiaries();
   }
 
-  // 获取单条日记全文
+  // 展开全文
   async function expandDiary(uuid) {
     setExpanded(uuid);
     setFullContent('');
-    const local = diaries.find(d => d.uuid === uuid);
-    // 若本地有全文且已展示则直接用，否则强制查supabase，防止后端有变更
-    if (local && local.content && local.content.length > BLUR_LENGTH) {
-      // 只查content字段
-      const { data, error } = await supabase
-        .from('diary')
-        .select('content')
-        .eq('uuid', uuid)
-        .maybeSingle();
-      if (!error && data) setFullContent(data.content);
-      else setFullContent(local.content); // 回退
-    } else if (local) {
-      setFullContent(local.content || '');
-    }
+    const { data, error } = await supabase
+      .from('diary')
+      .select('content')
+      .eq('uuid', uuid)
+      .maybeSingle();
+    if (!error && data) setFullContent(data.content);
   }
-
-  // 关闭全文
   function collapseDiary() {
     setExpanded(null);
     setFullContent('');
   }
-
-  // 滚动监听
-  useEffect(() => {
-    if (showAll || endReached) return;
-    const handleScroll = () => {
-      if (!listRef.current) return;
-      const { scrollTop, scrollHeight, clientHeight } = listRef.current;
-      if (scrollTop + clientHeight >= scrollHeight - 40) {
-        handleLoadMore();
-      }
-    };
-    const ref = listRef.current;
-    if (ref) ref.addEventListener('scroll', handleScroll);
-    return () => {
-      if (ref) ref.removeEventListener('scroll', handleScroll);
-    };
-    // eslint-disable-next-line
-  }, [showDiaries, diaries, showAll, endReached]);
-
-  // 列表展示内容
-  const displayDiaries = diaries.filter(d => showDiaries.includes(d.uuid));
 
   return (
     <div style={{ maxWidth: 700, margin: '30px auto', padding: 20, display: 'flex', gap: 32 }}>
@@ -178,7 +179,7 @@ function DiaryApp() {
         >
           {loading ? <div>加载中...</div> : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {displayDiaries.map(diary => (
+              {diaries.map(diary => (
                 <li
                   key={diary.uuid}
                   style={{
@@ -207,11 +208,8 @@ function DiaryApp() {
                       </div>
                     ) : (
                       <div style={{ marginTop: 6, marginBottom: 6, color: '#222' }}>
-                        {diary.content ? (
-                          diary.content.length > BLUR_LENGTH
-                            ? `${diary.content.slice(0, BLUR_LENGTH)}...`
-                            : diary.content
-                        ) : ''}
+                        {diary.content}
+                        {(diary.content && diary.content.length === BLUR_LENGTH) && '...'}
                       </div>
                     )
                   }
@@ -226,11 +224,11 @@ function DiaryApp() {
                   </button>
                 </li>
               ))}
-              {!loading && displayDiaries.length === 0 && <li>暂无日记</li>}
+              {!loading && diaries.length === 0 && <li>暂无日记</li>}
             </ul>
           )}
           {/* 加载更多/到底提示 */}
-          {(!showAll && !loading && displayDiaries.length > 0 && !endReached) &&
+          {(!showAll && !loading && diaries.length > 0 && !endReached) &&
             <div style={{ textAlign: 'center', color: '#888', padding: 8 }}>
               {loadingMore ? '加载中...' : '下拉可加载更多'}
             </div>
@@ -238,7 +236,6 @@ function DiaryApp() {
           {endReached && <div style={{ textAlign: 'center', color: '#aaa', padding: 8 }}>已经到底啦~</div>}
         </div>
       </div>
-      {/* 右侧 “加载全部”按钮，移动到上方列表标题旁 */}
     </div>
   );
 }
