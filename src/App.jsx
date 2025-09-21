@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DiaryApp from './DiaryApp.jsx';
 import axios from 'axios';
+import crypto from 'crypto-js'; // 需要安装: npm install crypto-js
 
 function trackPageVisit() {
   const currentPageUrl = window.location.href;
@@ -20,6 +21,17 @@ function setupTracking() {
       setTimeout(trackPageVisit, 1000);
     });
   }
+}
+
+// 生成随机盐值
+function generateSalt() {
+  return crypto.lib.WordArray.random(16).toString(); // 16字节随机盐值
+}
+
+// 对密码进行盐值哈希处理
+function hashPasswordWithSalt(password, salt) {
+  // 使用SHA-256算法，先将密码和盐值组合后哈希
+  return crypto.SHA256(password + salt).toString();
 }
 
 function App() {
@@ -63,9 +75,17 @@ function App() {
     }
 
     try {
+      // 生成盐值并对密码进行哈希处理
+      const salt = generateSalt();
+      const hashedPassword = hashPasswordWithSalt(password, salt);
+
+      // 仅传输哈希值和盐值，不传输原始密码
       const response = await axios.post(
         'https://diary.m-code.top/api/verifyPassword',
-        { password },
+        { 
+          hashedPassword,
+          salt 
+        },
         { headers: { 'Content-Type': 'application/json' } }
       );
 
