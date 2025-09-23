@@ -4,248 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的日记本</title>
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             background: #f0f2f5;
-            min-height: 100vh;
+            line-height: 1.6;
+            padding: 0;
+        }
+        .container {
+            max-width: 100%;
+            margin: 0;
             padding: 20px;
         }
-        .app-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            gap: 32px;
-        }
-        .left-panel {
-            flex: 1;
+        header {
             background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .right-panel {
-            width: 300px;
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        h1 { 
-            color: #333;
+            padding: 20px;
+            border-radius: 10px;
             margin-bottom: 20px;
-            font-size: 28px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        h2 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 22px;
+        h1 { color: #333; margin-bottom: 10px; }
+        .add-diary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        input, textarea {
+        input, textarea, button {
             width: 100%;
             padding: 12px;
             margin-bottom: 15px;
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
-            font-family: inherit;
-        }
-        textarea {
-            resize: vertical;
-            min-height: 120px;
         }
         button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
             cursor: pointer;
-            font-size: 16px;
-            transition: transform 0.2s;
+            transition: background 0.3s;
         }
-        button:hover {
-            transform: translateY(-2px);
-        }
-        .success-msg {
-            color: #28a745;
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #f8fff9;
-            border-radius: 5px;
-        }
-        .error-msg {
-            color: #e74c3c;
-            margin-bottom: 15px;
-            padding: 10px;
-            background: #fff5f5;
-            border-radius: 5px;
-        }
-        .diary-list {
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            border-radius: 8px;
-            padding: 15px;
-            background: #fafbfc;
-        }
-        .diary-item {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .diary-item:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .diary-item.expanded {
-            background: #f5faff;
-            cursor: default;
-        }
-        .diary-title {
-            font-weight: bold;
-            font-size: 18px;
-            margin-bottom: 5px;
-            color: #333;
-        }
-        .diary-date {
-            color: #888;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        .diary-content {
-            color: #222;
-            line-height: 1.5;
-            margin-bottom: 10px;
-        }
-        .diary-content.blurred {
-            color: #666;
-        }
+        button:hover { background: #5a6fd8; }
         .delete-btn {
             background: #e74c3c;
-            padding: 6px 12px;
-            font-size: 14px;
-            margin-top: 10px;
+            width: auto;
+            padding: 8px 15px;
+            margin-left: 10px;
         }
-        .load-more {
-            text-align: center;
-            color: #888;
-            padding: 10px;
-            cursor: pointer;
+        .expand-btn {
+            background: #3498db;
+            width: auto;
+            padding: 8px 15px;
         }
-        .end-message {
-            text-align: center;
-            color: #aaa;
-            padding: 10px;
-            font-style: italic;
-        }
-        .load-all-btn {
-            background: #28a745;
-            margin-bottom: 15px;
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-        .loading {
-            text-align: center;
-            color: #888;
+        .diary-container {
+            max-height: 600px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 10px;
             padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
-        /* 搜索功能样式 */
-        .search-container {
-            margin-bottom: 20px;
-            background: #f8f9fa;
-            padding: 15px;
+        .diary-item {
+            border: 1px solid #e1e8ed;
             border-radius: 8px;
-        }
-        .search-tabs {
-            display: flex;
+            padding: 15px;
             margin-bottom: 15px;
-            border-bottom: 1px solid #ddd;
+            background: #fafbfc;
+            transition: all 0.3s;
         }
-        .search-tab {
-            padding: 8px 16px;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+        .diary-item.expanded { background: #f0f7ff; border-color: #667eea; }
+        .diary-title { font-weight: bold; font-size: 18px; color: #2c3e50; }
+        .diary-date { color: #7f8c8d; font-size: 14px; margin: 5px 0; }
+        .diary-content { 
+            margin: 10px 0; 
+            white-space: pre-line;
+            line-height: 1.8;
         }
-        .search-tab.active {
-            border-bottom-color: #667eea;
-            color: #667eea;
-            font-weight: bold;
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
         }
-        .search-input {
-            display: none;
-        }
-        .search-input.active {
-            display: block;
-        }
-        .search-results-info {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-        .highlight {
-            background-color: #ffeb3b;
-            padding: 0 2px;
-            border-radius: 2px;
-        }
-        .clear-search {
-            background: #6c757d;
-            margin-top: 10px;
-            padding: 8px 16px;
-            font-size: 14px;
-        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .load-more { text-align: center; padding: 15px; color: #7f8c8d; }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="left-panel">
-            <h1>我的日记本</h1>
-            <div id="successMsg" class="success-msg" style="display: none;">保存成功！</div>
-            <div id="errorMsg" class="error-msg" style="display: none;"></div>
-            
-            <form id="diaryForm">
+    <div class="container">
+        <header>
+            <h1>📖 我的日记本</h1>
+            <p>记录生活中的点点滴滴</p>
+        </header>
+
+        <div class="add-diary">
+            <h2>✏️ 写新日记</h2>
+            <form id="addForm">
                 <input type="text" id="diaryTitle" placeholder="日记标题" required>
-                <textarea id="diaryContent" placeholder="写下今天的内容..." required></textarea>
-                <button type="submit">添加日记</button>
+                <textarea id="diaryContent" placeholder="写下今天的心情和故事..." rows="5" required></textarea>
+                <button type="submit">保存日记</button>
             </form>
-            
-            <hr style="margin: 25px 0; border: none; border-top: 1px solid #eee;">
-            
-            <!-- 搜索功能 -->
-            <div class="search-container">
-                <h2>搜索日记</h2>
-                <div class="search-tabs">
-                    <div class="search-tab active" data-type="title">按标题</div>
-                    <div class="search-tab" data-type="date">按日期</div>
-                    <div class="search-tab" data-type="content">按内容</div>
-                </div>
-                <div class="search-input active" id="searchTitle">
-                    <input type="text" id="searchTitleInput" placeholder="输入标题关键词...">
-                </div>
-                <div class="search-input" id="searchDate">
-                    <input type="date" id="searchDateInput">
-                </div>
-                <div class="search-input" id="searchContent">
-                    <input type="text" id="searchContentInput" placeholder="输入内容关键词...">
-                </div>
-                <button id="searchBtn">搜索</button>
-                <button id="clearSearch" class="clear-search">清除搜索</button>
-                <div id="searchResultsInfo" class="search-results-info"></div>
-            </div>
-            
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
-                <h2 style="margin: 0;">日记列表</h2>
-                <button id="loadAllBtn" class="load-all-btn">加载全部</button>
-            </div>
-            
-            <div id="diaryList" class="diary-list">
-                <div class="loading">加载中...</div>
+            <div id="message" class="message"></div>
+        </div>
+
+        <div class="diary-list">
+            <h2>📚 日记列表</h2>
+            <div id="diaryContainer" class="diary-container">
+                <div id="loading">⏳ 加载中...</div>
             </div>
         </div>
     </div>
@@ -256,380 +127,225 @@
                 this.PAGE_SIZE = 10;
                 this.BLUR_LENGTH = 100;
                 this.diaries = [];
-                this.showDiaries = [];
-                this.showAll = false;
-                this.loading = false;
-                this.loadingMore = false;
+                this.fullContentCache = {};
+                this.expandedId = null;
+                this.offset = 0;
                 this.endReached = false;
-                this.expandedUuid = null;
-                this.fullContent = '';
-                this.searchActive = false;
-                this.searchResults = [];
-                this.currentSearchType = 'title';
-                
-                this.supabaseUrl = '';
-                this.supabaseKey = '';
-                
+                this.loading = false;
+                this.supabase = null;
+                this.totalCount = null;
                 this.init();
             }
-            
-            init() {
-                this.parseUrlParams();
-                this.initSupabase();
-                this.bindEvents();
-                this.fetchAllDiaries();
-                this.updateStats();
+
+            async getTotalCount() {
+                if (!this.supabase) return;
+                try {
+                    const { count, error } = await this.supabase
+                        .from('diary')
+                        .select('uuid', { count: 'exact', head: true });
+                    if (error) throw new Error(error.message);
+                    this.totalCount = count;
+                } catch (error) {
+                    this.totalCount = null;
+                }
             }
-            
-            parseUrlParams() {
+
+            init() {
                 const urlParams = new URLSearchParams(window.location.search);
-                this.supabaseUrl = urlParams.get('link');
-                this.supabaseKey = urlParams.get('key');
-                
-                if (!this.supabaseUrl || !this.supabaseKey) {
-                    window.location.href = 'index.html';
+                const supabaseUrl = urlParams.get('link');
+                const supabaseKey = urlParams.get('key');
+                if (!supabaseUrl || !supabaseKey) {
+                    setTimeout(() => window.location.href = 'index.html', 1);
                     return;
                 }
+                this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+                this.clearSensitiveParams();
+                this.bindEvents();
+                this.loadDiaries();
             }
-            
-            initSupabase() {
-                this.supabase = supabase.createClient(this.supabaseUrl, this.supabaseKey);
+
+            clearSensitiveParams() {
+                if (window.history.replaceState) {
+                    const cleanUrl = window.location.origin + window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }
             }
-            
+
             bindEvents() {
-                document.getElementById('diaryForm').addEventListener('submit', (e) => this.addDiary(e));
-                document.getElementById('loadAllBtn').addEventListener('click', () => this.handleLoadAll());
-                
-                // 搜索相关事件
-                document.querySelectorAll('.search-tab').forEach(tab => {
-                    tab.addEventListener('click', (e) => this.switchSearchTab(e.target.getAttribute('data-type')));
-                });
-                document.getElementById('searchBtn').addEventListener('click', () => this.performSearch());
-                document.getElementById('clearSearch').addEventListener('click', () => this.clearSearch());
-                
-                const diaryList = document.getElementById('diaryList');
-                diaryList.addEventListener('scroll', () => this.handleScroll());
-                diaryList.addEventListener('click', (e) => this.handleDiaryClick(e));
+                document.getElementById('addForm').addEventListener('submit', (e) => this.addDiary(e));
+                document.getElementById('diaryContainer').addEventListener('scroll', () => this.handleScroll());
             }
-            
-            async fetchAllDiaries() {
+
+            async loadDiaries(append = false) {
+                if (this.loading || !this.supabase) return;
                 this.loading = true;
-                this.endReached = false;
-                this.updateDiaryList();
-                
-                const { data, error } = await this.supabase
-                    .from('diary')
-                    .select('uuid,created_at,name,content')
-                    .order('created_at', { ascending: false });
-                    
-                if (!error) {
-                    this.diaries = data || [];
-                    if (this.diaries.length <= this.PAGE_SIZE) {
-                        this.endReached = true;
-                    }
-                    this.showDiaries = this.diaries.slice(0, this.PAGE_SIZE).map(d => d.uuid);
-                } else {
-                    this.showError(error.message);
+                const container = document.getElementById('diaryContainer');
+                if (!append) {
+                    container.innerHTML = '<div id="loading">⏳ 加载中...</div>';
                 }
-                
-                this.loading = false;
-                this.updateDiaryList();
-                this.updateStats();
-            }
-            
-            handleLoadMore() {
-                if (this.loadingMore || this.endReached || this.showAll || this.searchActive) return;
-                
-                this.loadingMore = true;
-                this.updateDiaryList();
-                
-                setTimeout(() => {
-                    const newLength = this.showDiaries.length + this.PAGE_SIZE;
-                    this.showDiaries = this.diaries.slice(0, newLength).map(d => d.uuid);
-                    
-                    if (newLength >= this.diaries.length) {
-                        this.endReached = true;
+                try {
+                    if (this.totalCount == null) {
+                        await this.getTotalCount();
                     }
-                    
-                    this.loadingMore = false;
-                    this.updateDiaryList();
-                    this.updateStats();
-                }, 0);
-            }
-            
-            handleLoadAll() {
-                this.showAll = true;
-                this.showDiaries = this.diaries.map(d => d.uuid);
-                this.endReached = true;
-                this.updateDiaryList();
-                this.updateStats();
-            }
-            
-            async addDiary(e) {
-                e.preventDefault();
-                
-                const title = document.getElementById('diaryTitle').value;
-                const content = document.getElementById('diaryContent').value;
-                
-                if (!title || !content) return;
-                
-                this.hideError();
-                const { error } = await this.supabase.from('diary').insert([
-                    { name: title, content: content }
-                ]);
-                
-                if (!error) {
-                    document.getElementById('diaryTitle').value = '';
-                    document.getElementById('diaryContent').value = '';
-                    this.showSuccess();
-                    await this.fetchAllDiaries();
-                } else {
-                    this.showError(error.message);
-                }
-            }
-            
-            async deleteDiary(uuid) {
-                if (!confirm('确定要删除这篇日记吗？')) return;
-                
-                await this.supabase.from('diary').delete().eq('uuid', uuid);
-                await this.fetchAllDiaries();
-            }
-            
-            async expandDiary(uuid) {
-                this.expandedUuid = uuid;
-                this.fullContent = '';
-                this.updateDiaryList();
-                
-                const localDiary = this.diaries.find(d => d.uuid === uuid);
-                if (localDiary && localDiary.content && localDiary.content.length > this.BLUR_LENGTH) {
                     const { data, error } = await this.supabase
                         .from('diary')
-                        .select('content')
-                        .eq('uuid', uuid)
-                        .maybeSingle();
-                        
-                    if (!error && data) {
-                        this.fullContent = data.content;
-                    } else {
-                        this.fullContent = localDiary.content;
+                        .select('uuid, created_at, name, content')
+                        .order('created_at', { ascending: false })
+                        .range(this.offset, this.offset + this.PAGE_SIZE - 1);
+                    if (error) throw new Error(error.message);
+                    if (data.length === 0) {
+                        this.endReached = true;
+                        if (!append) container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
+                        this.loading = false;
+                        return;
                     }
-                } else if (localDiary) {
-                    this.fullContent = localDiary.content || '';
-                }
-                
-                this.updateDiaryList();
-            }
-            
-            collapseDiary() {
-                this.expandedUuid = null;
-                this.fullContent = '';
-                this.updateDiaryList();
-            }
-            
-            handleScroll() {
-                const diaryList = document.getElementById('diaryList');
-                if (this.showAll || this.endReached || this.searchActive) return;
-                
-                const { scrollTop, scrollHeight, clientHeight } = diaryList;
-                if (scrollTop + clientHeight >= scrollHeight - 40) {
-                    this.handleLoadMore();
+                    const processedData = data.map(diary => ({
+                        ...diary,
+                        preview: diary.content ? diary.content.slice(0, this.BLUR_LENGTH) : '',
+                        hasMore: diary.content ? diary.content.length > this.BLUR_LENGTH : false
+                    }));
+                    this.diaries = append ? [...this.diaries, ...processedData] : processedData;
+                    this.offset += data.length;
+                    if (this.offset >= this.totalCount) {
+                        this.endReached = true;
+                    }
+                    this.renderDiaries();
+                } catch (error) {
+                    this.showMessage('❌ 加载失败: ' + error.message, 'error');
+                } finally {
+                    this.loading = false;
                 }
             }
-            
-            handleDiaryClick(e) {
-                if (e.target.classList.contains('delete-btn')) {
-                    const uuid = e.target.getAttribute('data-uuid');
-                    this.deleteDiary(uuid);
-                    return;
-                }
-                
-                if (e.target.classList.contains('collapse-btn')) {
-                    this.collapseDiary();
-                    return;
-                }
-                
-                const diaryItem = e.target.closest('.diary-item');
-                if (diaryItem && !diaryItem.classList.contains('expanded')) {
-                    const uuid = diaryItem.getAttribute('data-uuid');
-                    this.expandDiary(uuid);
-                }
-            }
-            
-            // 搜索功能相关方法
-            switchSearchTab(type) {
-                this.currentSearchType = type;
-                
-                // 更新标签状态
-                document.querySelectorAll('.search-tab').forEach(tab => {
-                    tab.classList.remove('active');
+
+            renderDiaries() {
+                const container = document.getElementById('diaryContainer');
+                container.innerHTML = '';
+                this.diaries.forEach(diary => {
+                    container.appendChild(this.createDiaryElement(diary));
                 });
-                document.querySelector(`.search-tab[data-type="${type}"]`).classList.add('active');
-                
-                // 更新输入框显示
-                document.querySelectorAll('.search-input').forEach(input => {
-                    input.classList.remove('active');
-                });
-                document.getElementById(`search${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
-            }
-            
-            performSearch() {
-                const searchInput = document.getElementById(`search${this.currentSearchType.charAt(0).toUpperCase() + this.currentSearchType.slice(1)}Input`);
-                const searchTerm = searchInput.value.trim();
-                
-                if (!searchTerm) {
-                    this.showError('请输入搜索关键词');
-                    return;
-                }
-                
-                this.searchActive = true;
-                this.searchResults = [];
-                
-                switch(this.currentSearchType) {
-                    case 'title':
-                        this.searchResults = this.diaries.filter(diary => 
-                            diary.name && diary.name.toLowerCase().includes(searchTerm.toLowerCase())
-                        );
-                        break;
-                    case 'date':
-                        // 将日期格式化为YYYY-MM-DD进行匹配
-                        const searchDate = new Date(searchTerm).toISOString().split('T')[0];
-                        this.searchResults = this.diaries.filter(diary => {
-                            const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
-                            return diaryDate === searchDate;
-                        });
-                        break;
-                    case 'content':
-                        this.searchResults = this.diaries.filter(diary => 
-                            diary.content && diary.content.toLowerCase().includes(searchTerm.toLowerCase())
-                        );
-                        break;
-                }
-                
-                this.showDiaries = this.searchResults.map(d => d.uuid);
-                this.updateDiaryList();
-                this.updateSearchResultsInfo();
-            }
-            
-            clearSearch() {
-                this.searchActive = false;
-                this.searchResults = [];
-                this.showAll = false;
-                this.endReached = false;
-                this.showDiaries = this.diaries.slice(0, this.PAGE_SIZE).map(d => d.uuid);
-                this.updateDiaryList();
-                
-                // 清空搜索输入框
-                document.getElementById('searchTitleInput').value = '';
-                document.getElementById('searchDateInput').value = '';
-                document.getElementById('searchContentInput').value = '';
-                
-                document.getElementById('searchResultsInfo').textContent = '';
-            }
-            
-            updateSearchResultsInfo() {
-                const infoElement = document.getElementById('searchResultsInfo');
-                if (this.searchActive) {
-                    infoElement.textContent = `找到 ${this.searchResults.length} 篇相关日记`;
+                if (this.diaries.length > 0) {
+                    const endMessage = document.createElement('div');
+                    endMessage.className = 'load-more';
+                    if (this.endReached) {
+                        endMessage.textContent = '🎉 已经到底啦~';
+                    } else {
+                        endMessage.textContent = '⬇️ 下拉加载更多';
+                    }
+                    container.appendChild(endMessage);
                 } else {
-                    infoElement.textContent = '';
+                    container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
                 }
             }
-            
-            // 高亮搜索结果中的关键词
-            highlightText(text, searchTerm) {
-                if (!searchTerm || !text) return text;
-                
-                const regex = new RegExp(`(${searchTerm})`, 'gi');
-                return text.replace(regex, '<span class="highlight">$1</span>');
-            }
-            
-            updateDiaryList() {
-                const diaryList = document.getElementById('diaryList');
-                const displayDiaries = this.searchActive ? 
-                    this.searchResults : 
-                    this.diaries.filter(d => this.showDiaries.includes(d.uuid));
-                
-                if (this.loading) {
-                    diaryList.innerHTML = '<div class="loading">加载中...</div>';
-                    return;
-                }
-                
-                let html = '';
-                
-                if (displayDiaries.length === 0) {
-                    html = '<div style="text-align: center; color: #888; padding: 20px;">暂无日记</div>';
-                } else {
-                    displayDiaries.forEach(diary => {
-                        const isExpanded = this.expandedUuid === diary.uuid;
-                        let content = isExpanded ? 
-                            (this.fullContent || '加载中...') : 
-                            (diary.content && diary.content.length > this.BLUR_LENGTH ? 
-                                `${diary.content.slice(0, this.BLUR_LENGTH)}...` : 
-                                diary.content || '');
-                        
-                        // 高亮搜索结果
-                        if (this.searchActive) {
-                            const searchInput = document.getElementById(`search${this.currentSearchType.charAt(0).toUpperCase() + this.currentSearchType.slice(1)}Input`);
-                            const searchTerm = searchInput.value.trim();
-                            
-                            if (this.currentSearchType === 'title') {
-                                diary.name = this.highlightText(diary.name, searchTerm);
-                            } else if (this.currentSearchType === 'content') {
-                                content = this.highlightText(content, searchTerm);
-                            }
+
+            createDiaryElement(diary) {
+                const diaryDiv = document.createElement('div');
+                diaryDiv.className = `diary-item ${this.expandedId === diary.uuid ? 'expanded' : ''}`;
+                const isExpanded = this.expandedId === diary.uuid;
+                const content = isExpanded ? 
+                    (this.fullContentCache[diary.uuid] || '⏳ 加载中...') : 
+                    diary.preview + (diary.hasMore ? '...' : '');
+                diaryDiv.innerHTML = `
+                    <div class="diary-title">${diary.name}</div>
+                    <div class="diary-date">📅 ${new Date(diary.created_at + 'Z').toLocaleString('zh-CN')}</div>
+                    <div class="diary-content">${content}</div>
+                    <div style="margin-top: 10px;">
+                        ${diary.hasMore && !isExpanded ? 
+                            `<button class="expand-btn" onclick="diaryApp.expandDiary('${diary.uuid}')">📖 查看全文</button>` : ''}
+                        ${isExpanded ? 
+                            `<button class="expand-btn" onclick="diaryApp.collapseDiary()">📄 收起</button>` : ''}
+                        <button class="delete-btn" onclick="diaryApp.deleteDiary('${diary.uuid}')">🗑️ 删除</button>
+                    </div>
+                `;
+                if (!isExpanded) {
+                    diaryDiv.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('expand-btn') && !e.target.classList.contains('delete-btn')) {
+                            this.expandDiary(diary.uuid);
                         }
-                        
-                        html += `
-                            <div class="diary-item ${isExpanded ? 'expanded' : ''}" data-uuid="${diary.uuid}">
-                                <div class="diary-title">${diary.name}</div>
-                                <div class="diary-date">${new Date(diary.created_at + 'Z').toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })}</div>
-                                <div class="diary-content ${!isExpanded && diary.content && diary.content.length > this.BLUR_LENGTH ? 'blurred' : ''}">
-                                    ${content}
-                                    ${isExpanded ? `<div><button class="collapse-btn" style="margin-top: 10px;">收起</button></div>` : ''}
-                                </div>
-                                <button class="delete-btn" data-uuid="${diary.uuid}">删除</button>
-                            </div>
-                        `;
                     });
                 }
-                
-                if (!this.showAll && !this.loading && !this.searchActive && displayDiaries.length > 0 && !this.endReached) {
-                    html += `<div class="load-more">${this.loadingMore ? '加载中...' : '下拉可加载更多'}</div>`;
-                }
-                
-                if ((this.endReached || this.searchActive) && displayDiaries.length > 0) {
-                    html += '<div class="end-message">已经到底啦~</div>';
-                }
-                
-                diaryList.innerHTML = html;
+                return diaryDiv;
             }
-            
-            updateStats() {
-                document.getElementById('totalCount').textContent = this.diaries.length;
-                document.getElementById('shownCount').textContent = this.showDiaries.length;
+
+            async expandDiary(uuid) {
+                this.expandedId = uuid;
+                if (!this.fullContentCache[uuid]) {
+                    try {
+                        const { data, error } = await this.supabase
+                            .from('diary')
+                            .select('content')
+                            .eq('uuid', uuid)
+                            .single();
+                        if (!error && data) this.fullContentCache[uuid] = data.content;
+                    } catch (error) {}
+                }
+                this.renderDiaries();
             }
-            
-            showSuccess() {
-                const successMsg = document.getElementById('successMsg');
-                successMsg.style.display = 'block';
+
+            collapseDiary() { this.expandedId = null; this.renderDiaries(); }
+
+            async addDiary(e) {
+                e.preventDefault();
+                const title = document.getElementById('diaryTitle').value;
+                const content = document.getElementById('diaryContent').value;
+                if (!title || !content) {
+                    this.showMessage('❌ 请填写标题和内容', 'error');
+                    return;
+                }
+                try {
+                    const { error } = await this.supabase.from('diary').insert([{ name: title, content }]);
+                    if (error) throw new Error(error.message);
+                    this.showMessage('✅ 保存成功！', 'success');
+                    document.getElementById('diaryTitle').value = '';
+                    document.getElementById('diaryContent').value = '';
+                    this.offset = 0;
+                    this.endReached = false;
+                    this.diaries = [];
+                    this.totalCount = null;
+                    await this.loadDiaries();
+                } catch (error) {
+                    this.showMessage('❌ 添加失败: ' + error.message, 'error');
+                }
+            }
+
+            async deleteDiary(uuid) {
+                if (!confirm('确定要删除这篇日记吗？此操作不可恢复！')) return;
+                try {
+                    const { error } = await this.supabase.from('diary').delete().eq('uuid', uuid);
+                    if (error) throw new Error(error.message);
+                    this.showMessage('✅ 删除成功', 'success');
+                    this.offset = 0;
+                    this.endReached = false;
+                    this.diaries = [];
+                    this.totalCount = null;
+                    await this.loadDiaries();
+                } catch (error) {
+                    this.showMessage('❌ 删除失败: ' + error.message, 'error');
+                }
+            }
+
+            handleScroll() {
+                const container = document.getElementById('diaryContainer');
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                if (scrollTop + clientHeight >= scrollHeight - 50 && !this.loading && !this.endReached) {
+                    this.loadDiaries(true);
+                }
+            }
+
+            showMessage(message, type) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = message;
+                messageDiv.className = `message ${type}`;
                 setTimeout(() => {
-                    successMsg.style.display = 'none';
-                }, 1600);
-            }
-            
-            showError(message) {
-                const errorMsg = document.getElementById('errorMsg');
-                errorMsg.textContent = message;
-                errorMsg.style.display = 'block';
-            }
-            
-            hideError() {
-                document.getElementById('errorMsg').style.display = 'none';
+                    messageDiv.textContent = '';
+                    messageDiv.className = 'message';
+                }, 3000);
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', () => new DiaryApp());
+
+        let diaryApp;
+        document.addEventListener('DOMContentLoaded', () => {
+            diaryApp = new DiaryApp();
+        });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
 </html>
