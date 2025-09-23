@@ -148,7 +148,6 @@
 
                 this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
                 
-                // 清除URL中的敏感参数
                 this.clearSensitiveParams();
                 
                 this.bindEvents();
@@ -156,7 +155,6 @@
             }
 
             clearSensitiveParams() {
-                // 使用History API替换当前URL，不刷新页面
                 if (window.history.replaceState) {
                     const cleanUrl = window.location.origin + window.location.pathname;
                     window.history.replaceState({}, document.title, cleanUrl);
@@ -190,6 +188,7 @@
                     if (data.length === 0) {
                         this.endReached = true;
                         if (!append) container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
+                        this.loading = false;
                         return;
                     }
 
@@ -203,7 +202,9 @@
                     this.renderDiaries();
                     this.offset += this.PAGE_SIZE;
 
-                    if (data.length < this.PAGE_SIZE) this.endReached = true;
+                    if (data.length < this.PAGE_SIZE) {
+                        this.endReached = true;
+                    }
 
                 } catch (error) {
                     this.showMessage('❌ 加载失败: ' + error.message, 'error');
@@ -223,7 +224,7 @@
                 if (!this.endReached) {
                     const loadMore = document.createElement('div');
                     loadMore.className = 'load-more';
-                    loadMore.textContent = this.loading ? '⏳ 加载中...' : '⬇️ 下拉加载更多';
+                    loadMore.textContent = '⬇️ 下拉加载更多';
                     container.appendChild(loadMore);
                 } else if (this.diaries.length > 0) {
                     const endMessage = document.createElement('div');
