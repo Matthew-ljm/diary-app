@@ -128,7 +128,7 @@
                     const salt = this.generateSalt();
                     const hashedPassword = await this.hashPassword(password, salt);
 
-                    const response = await fetch('/api/verify', {
+                    const response = await fetch('https://pwd.m-code.top/api/diary', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ hashedPassword, salt })
