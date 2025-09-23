@@ -12,12 +12,12 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             background: #f0f2f5;
             line-height: 1.6;
-            padding: 0;
+            padding: 20px;
         }
         .container {
             max-width: 100%;
-            margin: 0;
-            padding: 20px;
+            margin: 0 auto;
+            padding: 0;
         }
         header {
             background: white;
@@ -94,6 +94,53 @@
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .load-more { text-align: center; padding: 15px; color: #7f8c8d; }
+        
+        /* 搜索功能样式 */
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .search-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .search-tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .search-tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .search-input {
+            display: none;
+        }
+        .search-input.active {
+            display: block;
+        }
+        .search-results-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .highlight {
+            background-color: #ffeb3b;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+        .clear-search {
+            background: #6c757d;
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -111,6 +158,28 @@
                 <button type="submit">保存日记</button>
             </form>
             <div id="message" class="message"></div>
+        </div>
+
+        <!-- 搜索功能 -->
+        <div class="search-container">
+            <h2>🔍 搜索日记</h2>
+            <div class="search-tabs">
+                <div class="search-tab active" data-type="title">按标题</div>
+                <div class="search-tab" data-type="date">按日期</div>
+                <div class="search-tab" data-type="content">按内容</div>
+            </div>
+            <div class="search-input active" id="searchTitle">
+                <input type="text" id="searchTitleInput" placeholder="输入标题关键词...">
+            </div>
+            <div class="search-input" id="searchDate">
+                <input type="date" id="searchDateInput">
+            </div>
+            <div class="search-input" id="searchContent">
+                <input type="text" id="searchContentInput" placeholder="输入内容关键词...">
+            </div>
+            <button id="searchBtn">搜索</button>
+            <button id="clearSearch" class="clear-search">清除搜索</button>
+            <div id="searchResultsInfo" class="search-results-info"></div>
         </div>
 
         <div class="diary-list">
@@ -134,6 +203,9 @@
                 this.loading = false;
                 this.supabase = null;
                 this.totalCount = null;
+                this.searchActive = false;
+                this.searchResults = [];
+                this.currentSearchType = 'title';
                 this.init();
             }
 
@@ -174,6 +246,13 @@
             bindEvents() {
                 document.getElementById('addForm').addEventListener('submit', (e) => this.addDiary(e));
                 document.getElementById('diaryContainer').addEventListener('scroll', () => this.handleScroll());
+                
+                // 搜索相关事件
+                document.querySelectorAll('.search-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => this.switchSearchTab(e.target.getAttribute('data-type')));
+                });
+                document.getElementById('searchBtn').addEventListener('click', () => this.performSearch());
+                document.getElementById('clearSearch').addEventListener('click', () => this.clearSearch());
             }
 
             async loadDiaries(append = false) {
@@ -220,20 +299,27 @@
             renderDiaries() {
                 const container = document.getElementById('diaryContainer');
                 container.innerHTML = '';
-                this.diaries.forEach(diary => {
+                
+                const displayDiaries = this.searchActive ? this.searchResults : this.diaries;
+                
+                if (displayDiaries.length === 0) {
+                    container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
+                    return;
+                }
+                
+                displayDiaries.forEach(diary => {
                     container.appendChild(this.createDiaryElement(diary));
                 });
-                if (this.diaries.length > 0) {
+                
+                if (displayDiaries.length > 0) {
                     const endMessage = document.createElement('div');
                     endMessage.className = 'load-more';
-                    if (this.endReached) {
+                    if (this.endReached || this.searchActive) {
                         endMessage.textContent = '🎉 已经到底啦~';
                     } else {
                         endMessage.textContent = '⬇️ 下拉加载更多';
                     }
                     container.appendChild(endMessage);
-                } else {
-                    container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
                 }
             }
 
@@ -241,9 +327,23 @@
                 const diaryDiv = document.createElement('div');
                 diaryDiv.className = `diary-item ${this.expandedId === diary.uuid ? 'expanded' : ''}`;
                 const isExpanded = this.expandedId === diary.uuid;
-                const content = isExpanded ? 
+                
+                let content = isExpanded ? 
                     (this.fullContentCache[diary.uuid] || '⏳ 加载中...') : 
                     diary.preview + (diary.hasMore ? '...' : '');
+                
+                // 高亮搜索结果
+                if (this.searchActive) {
+                    const searchInput = document.getElementById(`search${this.currentSearchType.charAt(0).toUpperCase() + this.currentSearchType.slice(1)}Input`);
+                    const searchTerm = searchInput.value.trim();
+                    
+                    if (this.currentSearchType === 'title') {
+                        diary.name = this.highlightText(diary.name, searchTerm);
+                    } else if (this.currentSearchType === 'content') {
+                        content = this.highlightText(content, searchTerm);
+                    }
+                }
+                
                 diaryDiv.innerHTML = `
                     <div class="diary-title">${diary.name}</div>
                     <div class="diary-date">📅 ${new Date(diary.created_at + 'Z').toLocaleString('zh-CN')}</div>
@@ -301,6 +401,8 @@
                     this.endReached = false;
                     this.diaries = [];
                     this.totalCount = null;
+                    this.searchActive = false;
+                    this.searchResults = [];
                     await this.loadDiaries();
                 } catch (error) {
                     this.showMessage('❌ 添加失败: ' + error.message, 'error');
@@ -317,6 +419,8 @@
                     this.endReached = false;
                     this.diaries = [];
                     this.totalCount = null;
+                    this.searchActive = false;
+                    this.searchResults = [];
                     await this.loadDiaries();
                 } catch (error) {
                     this.showMessage('❌ 删除失败: ' + error.message, 'error');
@@ -324,6 +428,8 @@
             }
 
             handleScroll() {
+                if (this.searchActive) return;
+                
                 const container = document.getElementById('diaryContainer');
                 const { scrollTop, scrollHeight, clientHeight } = container;
                 if (scrollTop + clientHeight >= scrollHeight - 50 && !this.loading && !this.endReached) {
@@ -339,6 +445,90 @@
                     messageDiv.textContent = '';
                     messageDiv.className = 'message';
                 }, 3000);
+            }
+            
+            // 搜索功能相关方法
+            switchSearchTab(type) {
+                this.currentSearchType = type;
+                
+                // 更新标签状态
+                document.querySelectorAll('.search-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                document.querySelector(`.search-tab[data-type="${type}"]`).classList.add('active');
+                
+                // 更新输入框显示
+                document.querySelectorAll('.search-input').forEach(input => {
+                    input.classList.remove('active');
+                });
+                document.getElementById(`search${type.charAt(0).toUpperCase() + type.slice(1)}`).classList.add('active');
+            }
+            
+            performSearch() {
+                const searchInput = document.getElementById(`search${this.currentSearchType.charAt(0).toUpperCase() + this.currentSearchType.slice(1)}Input`);
+                const searchTerm = searchInput.value.trim();
+                
+                if (!searchTerm) {
+                    this.showMessage('❌ 请输入搜索关键词', 'error');
+                    return;
+                }
+                
+                this.searchActive = true;
+                this.searchResults = [];
+                
+                switch(this.currentSearchType) {
+                    case 'title':
+                        this.searchResults = this.diaries.filter(diary => 
+                            diary.name && diary.name.toLowerCase().includes(searchTerm.toLowerCase())
+                        );
+                        break;
+                    case 'date':
+                        // 将日期格式化为YYYY-MM-DD进行匹配
+                        const searchDate = new Date(searchTerm).toISOString().split('T')[0];
+                        this.searchResults = this.diaries.filter(diary => {
+                            const diaryDate = new Date(diary.created_at).toISOString().split('T')[0];
+                            return diaryDate === searchDate;
+                        });
+                        break;
+                    case 'content':
+                        this.searchResults = this.diaries.filter(diary => 
+                            diary.content && diary.content.toLowerCase().includes(searchTerm.toLowerCase())
+                        );
+                        break;
+                }
+                
+                this.renderDiaries();
+                this.updateSearchResultsInfo();
+            }
+            
+            clearSearch() {
+                this.searchActive = false;
+                this.searchResults = [];
+                this.renderDiaries();
+                
+                // 清空搜索输入框
+                document.getElementById('searchTitleInput').value = '';
+                document.getElementById('searchDateInput').value = '';
+                document.getElementById('searchContentInput').value = '';
+                
+                document.getElementById('searchResultsInfo').textContent = '';
+            }
+            
+            updateSearchResultsInfo() {
+                const infoElement = document.getElementById('searchResultsInfo');
+                if (this.searchActive) {
+                    infoElement.textContent = `找到 ${this.searchResults.length} 篇相关日记`;
+                } else {
+                    infoElement.textContent = '';
+                }
+            }
+            
+            // 高亮搜索结果中的关键词
+            highlightText(text, searchTerm) {
+                if (!searchTerm || !text) return text;
+                
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                return text.replace(regex, '<span class="highlight">$1</span>');
             }
         }
 
