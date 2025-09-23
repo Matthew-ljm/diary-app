@@ -141,7 +141,7 @@
                             link: data.supabaseUrl,
                             key: data.supabaseKey
                         });
-                        window.location.href = `main.html?${params.toString()}`;
+                        window.location.href = `main?${params.toString()}`;
                     } else {
                         this.handleLoginFailure();
                     }

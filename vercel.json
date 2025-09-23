@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/verify.js"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/main",
+      "dest": "/main.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/404.html"
+    }
+  ],
+  "functions": {
+    "api/verify.js": {
+      "maxDuration": 10
+    }
+  }
+}
