@@ -147,8 +147,20 @@
                 }
 
                 this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+                
+                // 清除URL中的敏感参数
+                this.clearSensitiveParams();
+                
                 this.bindEvents();
                 this.loadDiaries();
+            }
+
+            clearSensitiveParams() {
+                // 使用History API替换当前URL，不刷新页面
+                if (window.history.replaceState) {
+                    const cleanUrl = window.location.origin + window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }
             }
 
             bindEvents() {
