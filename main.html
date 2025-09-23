@@ -132,24 +132,33 @@
                 this.endReached = false;
                 this.loading = false;
                 this.supabase = null;
-
+                this.totalCount = null;
                 this.init();
+            }
+
+            async getTotalCount() {
+                if (!this.supabase) return;
+                try {
+                    const { count, error } = await this.supabase
+                        .from('diary')
+                        .select('uuid', { count: 'exact', head: true });
+                    if (error) throw new Error(error.message);
+                    this.totalCount = count;
+                } catch (error) {
+                    this.totalCount = null;
+                }
             }
 
             init() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const supabaseUrl = urlParams.get('link');
                 const supabaseKey = urlParams.get('key');
-
                 if (!supabaseUrl || !supabaseKey) {
                     setTimeout(() => window.location.href = 'index.html', 1);
                     return;
                 }
-
                 this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
-                
                 this.clearSensitiveParams();
-                
                 this.bindEvents();
                 this.loadDiaries();
             }
@@ -168,44 +177,38 @@
 
             async loadDiaries(append = false) {
                 if (this.loading || !this.supabase) return;
-                
                 this.loading = true;
                 const container = document.getElementById('diaryContainer');
-                
                 if (!append) {
                     container.innerHTML = '<div id="loading">⏳ 加载中...</div>';
                 }
-
                 try {
+                    if (this.totalCount == null) {
+                        await this.getTotalCount();
+                    }
                     const { data, error } = await this.supabase
                         .from('diary')
                         .select('uuid, created_at, name, content')
                         .order('created_at', { ascending: false })
                         .range(this.offset, this.offset + this.PAGE_SIZE - 1);
-
                     if (error) throw new Error(error.message);
-
                     if (data.length === 0) {
                         this.endReached = true;
                         if (!append) container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
                         this.loading = false;
                         return;
                     }
-
                     const processedData = data.map(diary => ({
                         ...diary,
                         preview: diary.content ? diary.content.slice(0, this.BLUR_LENGTH) : '',
                         hasMore: diary.content ? diary.content.length > this.BLUR_LENGTH : false
                     }));
-
                     this.diaries = append ? [...this.diaries, ...processedData] : processedData;
-                    this.renderDiaries();
-                    this.offset += this.PAGE_SIZE;
-
-                    if (data.length < this.PAGE_SIZE) {
+                    this.offset += data.length;
+                    if (this.offset >= this.totalCount) {
                         this.endReached = true;
                     }
-
+                    this.renderDiaries();
                 } catch (error) {
                     this.showMessage('❌ 加载失败: ' + error.message, 'error');
                 } finally {
@@ -216,21 +219,17 @@
             renderDiaries() {
                 const container = document.getElementById('diaryContainer');
                 container.innerHTML = '';
-
                 this.diaries.forEach(diary => {
                     container.appendChild(this.createDiaryElement(diary));
                 });
-
                 if (this.diaries.length > 0) {
                     const endMessage = document.createElement('div');
                     endMessage.className = 'load-more';
-                    
                     if (this.endReached) {
                         endMessage.textContent = '🎉 已经到底啦~';
                     } else {
                         endMessage.textContent = '⬇️ 下拉加载更多';
                     }
-                    
                     container.appendChild(endMessage);
                 } else {
                     container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
@@ -240,12 +239,10 @@
             createDiaryElement(diary) {
                 const diaryDiv = document.createElement('div');
                 diaryDiv.className = `diary-item ${this.expandedId === diary.uuid ? 'expanded' : ''}`;
-                
                 const isExpanded = this.expandedId === diary.uuid;
                 const content = isExpanded ? 
                     (this.fullContentCache[diary.uuid] || '⏳ 加载中...') : 
                     diary.preview + (diary.hasMore ? '...' : '');
-
                 diaryDiv.innerHTML = `
                     <div class="diary-title">${diary.name}</div>
                     <div class="diary-date">📅 ${new Date(diary.created_at + 'Z').toLocaleString('zh-CN')}</div>
@@ -258,7 +255,6 @@
                         <button class="delete-btn" onclick="diaryApp.deleteDiary('${diary.uuid}')">🗑️ 删除</button>
                     </div>
                 `;
-
                 if (!isExpanded) {
                     diaryDiv.addEventListener('click', (e) => {
                         if (!e.target.classList.contains('expand-btn') && !e.target.classList.contains('delete-btn')) {
@@ -266,13 +262,11 @@
                         }
                     });
                 }
-
                 return diaryDiv;
             }
 
             async expandDiary(uuid) {
                 this.expandedId = uuid;
-                
                 if (!this.fullContentCache[uuid]) {
                     try {
                         const { data, error } = await this.supabase
@@ -280,11 +274,8 @@
                             .select('content')
                             .eq('uuid', uuid)
                             .single();
-
                         if (!error && data) this.fullContentCache[uuid] = data.content;
-                    } catch (error) {
-                        console.error('加载详细内容失败:', error);
-                    }
+                    } catch (error) {}
                 }
                 this.renderDiaries();
             }
@@ -293,28 +284,23 @@
 
             async addDiary(e) {
                 e.preventDefault();
-                
                 const title = document.getElementById('diaryTitle').value;
                 const content = document.getElementById('diaryContent').value;
-
                 if (!title || !content) {
                     this.showMessage('❌ 请填写标题和内容', 'error');
                     return;
                 }
-
                 try {
                     const { error } = await this.supabase.from('diary').insert([{ name: title, content }]);
                     if (error) throw new Error(error.message);
-
                     this.showMessage('✅ 保存成功！', 'success');
                     document.getElementById('diaryTitle').value = '';
                     document.getElementById('diaryContent').value = '';
-
                     this.offset = 0;
                     this.endReached = false;
                     this.diaries = [];
+                    this.totalCount = null;
                     await this.loadDiaries();
-
                 } catch (error) {
                     this.showMessage('❌ 添加失败: ' + error.message, 'error');
                 }
@@ -322,17 +308,15 @@
 
             async deleteDiary(uuid) {
                 if (!confirm('确定要删除这篇日记吗？此操作不可恢复！')) return;
-
                 try {
                     const { error } = await this.supabase.from('diary').delete().eq('uuid', uuid);
                     if (error) throw new Error(error.message);
-
                     this.showMessage('✅ 删除成功', 'success');
                     this.offset = 0;
                     this.endReached = false;
                     this.diaries = [];
+                    this.totalCount = null;
                     await this.loadDiaries();
-
                 } catch (error) {
                     this.showMessage('❌ 删除失败: ' + error.message, 'error');
                 }
@@ -341,7 +325,6 @@
             handleScroll() {
                 const container = document.getElementById('diaryContainer');
                 const { scrollTop, scrollHeight, clientHeight } = container;
-                
                 if (scrollTop + clientHeight >= scrollHeight - 50 && !this.loading && !this.endReached) {
                     this.loadDiaries(true);
                 }
@@ -351,7 +334,6 @@
                 const messageDiv = document.getElementById('message');
                 messageDiv.textContent = message;
                 messageDiv.className = `message ${type}`;
-                
                 setTimeout(() => {
                     messageDiv.textContent = '';
                     messageDiv.className = 'message';
