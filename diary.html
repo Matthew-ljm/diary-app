@@ -142,8 +142,7 @@
                 const supabaseKey = urlParams.get('key');
 
                 if (!supabaseUrl || !supabaseKey) {
-                    alert('无效的访问参数，即将跳转到登录页');
-                    setTimeout(() => window.location.href = 'index.html', 2000);
+                    setTimeout(() => window.location.href = 'index.html', 1);
                     return;
                 }
 
