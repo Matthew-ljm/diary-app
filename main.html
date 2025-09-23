@@ -180,14 +180,6 @@
                 <div class="loading">加载中...</div>
             </div>
         </div>
-        
-        <div class="right-panel">
-            <h2>统计信息</h2>
-            <div id="statsInfo">
-                <p>总日记数: <span id="totalCount">0</span></p>
-                <p>已显示: <span id="shownCount">0</span></p>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -224,7 +216,6 @@
                 this.supabaseKey = urlParams.get('key');
                 
                 if (!this.supabaseUrl || !this.supabaseKey) {
-                    alert('参数错误，将返回登录页');
                     window.location.href = 'index.html';
                     return;
                 }
