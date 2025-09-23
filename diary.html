@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的日记本</title>
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f0f2f5;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; margin-bottom: 10px; }
+        .add-diary {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover { background: #5a6fd8; }
+        .delete-btn {
+            background: #e74c3c;
+            width: auto;
+            padding: 8px 15px;
+            margin-left: 10px;
+        }
+        .expand-btn {
+            background: #3498db;
+            width: auto;
+            padding: 8px 15px;
+        }
+        .diary-container {
+            max-height: 600px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .diary-item {
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fafbfc;
+            transition: all 0.3s;
+        }
+        .diary-item.expanded { background: #f0f7ff; border-color: #667eea; }
+        .diary-title { font-weight: bold; font-size: 18px; color: #2c3e50; }
+        .diary-date { color: #7f8c8d; font-size: 14px; margin: 5px 0; }
+        .diary-content { 
+            margin: 10px 0; 
+            white-space: pre-line;
+            line-height: 1.8;
+        }
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .load-more { text-align: center; padding: 15px; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📖 我的日记本</h1>
+            <p>记录生活中的点点滴滴</p>
+        </header>
+
+        <div class="add-diary">
+            <h2>✏️ 写新日记</h2>
+            <form id="addForm">
+                <input type="text" id="diaryTitle" placeholder="日记标题" required>
+                <textarea id="diaryContent" placeholder="写下今天的心情和故事..." rows="5" required></textarea>
+                <button type="submit">保存日记</button>
+            </form>
+            <div id="message" class="message"></div>
+        </div>
+
+        <div class="diary-list">
+            <h2>📚 日记列表</h2>
+            <div id="diaryContainer" class="diary-container">
+                <div id="loading">⏳ 加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DiaryApp {
+            constructor() {
+                this.PAGE_SIZE = 10;
+                this.BLUR_LENGTH = 100;
+                this.diaries = [];
+                this.fullContentCache = {};
+                this.expandedId = null;
+                this.offset = 0;
+                this.endReached = false;
+                this.loading = false;
+                this.supabase = null;
+
+                this.init();
+            }
+
+            init() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const supabaseUrl = urlParams.get('link');
+                const supabaseKey = urlParams.get('key');
+
+                if (!supabaseUrl || !supabaseKey) {
+                    alert('无效的访问参数，即将跳转到登录页');
+                    setTimeout(() => window.location.href = 'index.html', 2000);
+                    return;
+                }
+
+                this.supabase = supabase.createClient(supabaseUrl, supabaseKey);
+                this.bindEvents();
+                this.loadDiaries();
+            }
+
+            bindEvents() {
+                document.getElementById('addForm').addEventListener('submit', (e) => this.addDiary(e));
+                document.getElementById('diaryContainer').addEventListener('scroll', () => this.handleScroll());
+            }
+
+            async loadDiaries(append = false) {
+                if (this.loading || !this.supabase) return;
+                
+                this.loading = true;
+                const container = document.getElementById('diaryContainer');
+                
+                if (!append) {
+                    container.innerHTML = '<div id="loading">⏳ 加载中...</div>';
+                }
+
+                try {
+                    const { data, error } = await this.supabase
+                        .from('diary')
+                        .select('uuid, created_at, name, content')
+                        .order('created_at', { ascending: false })
+                        .range(this.offset, this.offset + this.PAGE_SIZE - 1);
+
+                    if (error) throw new Error(error.message);
+
+                    if (data.length === 0) {
+                        this.endReached = true;
+                        if (!append) container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
+                        return;
+                    }
+
+                    const processedData = data.map(diary => ({
+                        ...diary,
+                        preview: diary.content ? diary.content.slice(0, this.BLUR_LENGTH) : '',
+                        hasMore: diary.content ? diary.content.length > this.BLUR_LENGTH : false
+                    }));
+
+                    this.diaries = append ? [...this.diaries, ...processedData] : processedData;
+                    this.renderDiaries();
+                    this.offset += this.PAGE_SIZE;
+
+                    if (data.length < this.PAGE_SIZE) this.endReached = true;
+
+                } catch (error) {
+                    this.showMessage('❌ 加载失败: ' + error.message, 'error');
+                } finally {
+                    this.loading = false;
+                }
+            }
+
+            renderDiaries() {
+                const container = document.getElementById('diaryContainer');
+                container.innerHTML = '';
+
+                this.diaries.forEach(diary => {
+                    container.appendChild(this.createDiaryElement(diary));
+                });
+
+                if (!this.endReached) {
+                    const loadMore = document.createElement('div');
+                    loadMore.className = 'load-more';
+                    loadMore.textContent = this.loading ? '⏳ 加载中...' : '⬇️ 下拉加载更多';
+                    container.appendChild(loadMore);
+                } else if (this.diaries.length > 0) {
+                    const endMessage = document.createElement('div');
+                    endMessage.className = 'load-more';
+                    endMessage.textContent = '🎉 已经到底啦~';
+                    container.appendChild(endMessage);
+                }
+            }
+
+            createDiaryElement(diary) {
+                const diaryDiv = document.createElement('div');
+                diaryDiv.className = `diary-item ${this.expandedId === diary.uuid ? 'expanded' : ''}`;
+                
+                const isExpanded = this.expandedId === diary.uuid;
+                const content = isExpanded ? 
+                    (this.fullContentCache[diary.uuid] || '⏳ 加载中...') : 
+                    diary.preview + (diary.hasMore ? '...' : '');
+
+                diaryDiv.innerHTML = `
+                    <div class="diary-title">${diary.name}</div>
+                    <div class="diary-date">📅 ${new Date(diary.created_at + 'Z').toLocaleString('zh-CN')}</div>
+                    <div class="diary-content">${content}</div>
+                    <div style="margin-top: 10px;">
+                        ${diary.hasMore && !isExpanded ? 
+                            `<button class="expand-btn" onclick="diaryApp.expandDiary('${diary.uuid}')">📖 查看全文</button>` : ''}
+                        ${isExpanded ? 
+                            `<button class="expand-btn" onclick="diaryApp.collapseDiary()">📄 收起</button>` : ''}
+                        <button class="delete-btn" onclick="diaryApp.deleteDiary('${diary.uuid}')">🗑️ 删除</button>
+                    </div>
+                `;
+
+                if (!isExpanded) {
+                    diaryDiv.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('expand-btn') && !e.target.classList.contains('delete-btn')) {
+                            this.expandDiary(diary.uuid);
+                        }
+                    });
+                }
+
+                return diaryDiv;
+            }
+
+            async expandDiary(uuid) {
+                this.expandedId = uuid;
+                
+                if (!this.fullContentCache[uuid]) {
+                    try {
+                        const { data, error } = await this.supabase
+                            .from('diary')
+                            .select('content')
+                            .eq('uuid', uuid)
+                            .single();
+
+                        if (!error && data) this.fullContentCache[uuid] = data.content;
+                    } catch (error) {
+                        console.error('加载详细内容失败:', error);
+                    }
+                }
+                this.renderDiaries();
+            }
+
+            collapseDiary() { this.expandedId = null; this.renderDiaries(); }
+
+            async addDiary(e) {
+                e.preventDefault();
+                
+                const title = document.getElementById('diaryTitle').value;
+                const content = document.getElementById('diaryContent').value;
+
+                if (!title || !content) {
+                    this.showMessage('❌ 请填写标题和内容', 'error');
+                    return;
+                }
+
+                try {
+                    const { error } = await this.supabase.from('diary').insert([{ name: title, content }]);
+                    if (error) throw new Error(error.message);
+
+                    this.showMessage('✅ 保存成功！', 'success');
+                    document.getElementById('diaryTitle').value = '';
+                    document.getElementById('diaryContent').value = '';
+
+                    this.offset = 0;
+                    this.endReached = false;
+                    this.diaries = [];
+                    await this.loadDiaries();
+
+                } catch (error) {
+                    this.showMessage('❌ 添加失败: ' + error.message, 'error');
+                }
+            }
+
+            async deleteDiary(uuid) {
+                if (!confirm('确定要删除这篇日记吗？此操作不可恢复！')) return;
+
+                try {
+                    const { error } = await this.supabase.from('diary').delete().eq('uuid', uuid);
+                    if (error) throw new Error(error.message);
+
+                    this.showMessage('✅ 删除成功', 'success');
+                    this.offset = 0;
+                    this.endReached = false;
+                    this.diaries = [];
+                    await this.loadDiaries();
+
+                } catch (error) {
+                    this.showMessage('❌ 删除失败: ' + error.message, 'error');
+                }
+            }
+
+            handleScroll() {
+                const container = document.getElementById('diaryContainer');
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                
+                if (scrollTop + clientHeight >= scrollHeight - 50 && !this.loading && !this.endReached) {
+                    this.loadDiaries(true);
+                }
+            }
+
+            showMessage(message, type) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = message;
+                messageDiv.className = `message ${type}`;
+                
+                setTimeout(() => {
+                    messageDiv.textContent = '';
+                    messageDiv.className = 'message';
+                }, 3000);
+            }
+        }
+
+        let diaryApp;
+        document.addEventListener('DOMContentLoaded', () => {
+            diaryApp = new DiaryApp();
+        });
+    </script>
+</body>
+</html>

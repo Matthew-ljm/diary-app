@@ -1,12 +1,186 @@
 <!DOCTYPE html>
 <html lang="zh">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>我的日记本</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日记本登录</title>
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            color: #333;
+            font-size: 24px;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled {
+            background: #ccc;
+            transform: none;
+            cursor: not-allowed;
+        }
+        .error { color: #e74c3c; margin-top: 10px; text-align: center; }
+        .lock-info { color: #f39c12; margin-top: 10px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>🔐 日记本登录</h2>
+        <form id="loginForm">
+            <input type="password" id="password" placeholder="请输入访问密码" required autofocus>
+            <button type="submit" id="submitBtn">进入日记本</button>
+        </form>
+        <div id="errorMsg" class="error"></div>
+        <div id="lockInfo" class="lock-info"></div>
+    </div>
+
+    <script>
+        class AuthManager {
+            constructor() {
+                this.errorCount = parseInt(localStorage.getItem('passwordErrorCount') || '0');
+                this.lockEndTime = parseInt(localStorage.getItem('passwordLockEndTime') || '0');
+                this.init();
+            }
+
+            init() {
+                document.getElementById('loginForm').addEventListener('submit', (e) => this.handleLogin(e));
+                this.updateUI();
+            }
+
+            isLocked() { return Date.now() < this.lockEndTime; }
+
+            getRemainingLockTime() {
+                const remaining = Math.ceil((this.lockEndTime - Date.now()) / (1000 * 60));
+                return remaining > 0 ? remaining : 0;
+            }
+
+            updateUI() {
+                const submitBtn = document.getElementById('submitBtn');
+                const lockInfo = document.getElementById('lockInfo');
+
+                if (this.isLocked()) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = `🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）`;
+                    lockInfo.textContent = `密码错误3次，账户已锁定${this.getRemainingLockTime()}分钟`;
+                } else {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '进入日记本';
+                    lockInfo.textContent = '';
+                }
+            }
+
+            generateSalt() {
+                const array = new Uint8Array(16);
+                crypto.getRandomValues(array);
+                return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+            }
+
+            async hashPassword(password, salt) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password + salt);
+                const hash = await crypto.subtle.digest('SHA-256', data);
+                return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+
+            async handleLogin(e) {
+                e.preventDefault();
+                
+                const password = document.getElementById('password').value;
+                const errorMsg = document.getElementById('errorMsg');
+
+                if (this.isLocked()) {
+                    errorMsg.textContent = `账户已锁定，请${this.getRemainingLockTime()}分钟后重试`;
+                    return;
+                }
+
+                try {
+                    const salt = this.generateSalt();
+                    const hashedPassword = await this.hashPassword(password, salt);
+
+                    const response = await fetch('/api/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ hashedPassword, salt })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const params = new URLSearchParams({
+                            link: data.supabaseUrl,
+                            key: data.supabaseKey
+                        });
+                        window.location.href = `diary.html?${params.toString()}`;
+                    } else {
+                        this.handleLoginFailure();
+                    }
+                } catch (error) {
+                    errorMsg.textContent = '网络错误，请检查连接';
+                    console.error('登录失败:', error);
+                }
+            }
+
+            handleLoginFailure() {
+                this.errorCount++;
+                localStorage.setItem('passwordErrorCount', this.errorCount.toString());
+
+                const errorMsg = document.getElementById('errorMsg');
+
+                if (this.errorCount >= 3) {
+                    this.lockEndTime = Date.now() + 60 * 60 * 1000;
+                    localStorage.setItem('passwordLockEndTime', this.lockEndTime.toString());
+                    errorMsg.textContent = '密码错误3次，账户已锁定1小时';
+                    this.trackPageVisit();
+                } else {
+                    errorMsg.textContent = `密码错误，还剩${3 - this.errorCount}次机会`;
+                }
+                this.updateUI();
+            }
+
+            trackPageVisit() {
+                const currentPageUrl = window.location.href;
+                const trackerUrl = 'https://mail.m-code.top/';
+                const fullTrackerUrl = `${trackerUrl}?url=${encodeURIComponent(currentPageUrl)}&event=password_lock`;
+                
+                const iframe = document.createElement('iframe');
+                iframe.src = fullTrackerUrl;
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => new AuthManager());
+    </script>
+</body>
 </html>
