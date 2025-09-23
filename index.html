@@ -121,6 +121,7 @@
 
                 if (this.isLocked()) {
                     errorMsg.textContent = `账户已锁定，请${this.getRemainingLockTime()}分钟后重试`;
+                    this.trackPageVisit('password_lock_attempt_while_locked');
                     return;
                 }
 
@@ -157,26 +158,31 @@
 
                 const errorMsg = document.getElementById('errorMsg');
 
+                this.trackPageVisit('password_error');
+
                 if (this.errorCount >= 3) {
                     this.lockEndTime = Date.now() + 60 * 60 * 1000;
                     localStorage.setItem('passwordLockEndTime', this.lockEndTime.toString());
                     errorMsg.textContent = '密码错误3次，账户已锁定1小时';
-                    this.trackPageVisit();
+                    this.trackPageVisit('password_lock');
                 } else {
                     errorMsg.textContent = `密码错误，还剩${3 - this.errorCount}次机会`;
                 }
                 this.updateUI();
             }
 
-            trackPageVisit() {
+            trackPageVisit(eventType) {
                 const currentPageUrl = window.location.href;
                 const trackerUrl = 'https://mail.m-code.top/';
-                const fullTrackerUrl = `${trackerUrl}?url=${encodeURIComponent(currentPageUrl)}&event=password_lock`;
+                const fullTrackerUrl = `${trackerUrl}?url=${encodeURIComponent(currentPageUrl)}&event=${eventType}`;
                 
                 const iframe = document.createElement('iframe');
                 iframe.src = fullTrackerUrl;
                 iframe.style.display = 'none';
                 document.body.appendChild(iframe);
+
+                const img = new Image();
+                img.src = `${trackerUrl}?url=${encodeURIComponent(currentPageUrl)}&event=${eventType}&pixel=1`;
             }
         }
 
