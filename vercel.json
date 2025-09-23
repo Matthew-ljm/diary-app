@@ -1,21 +1,30 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/verify.js"
-    },
-    {
-      "src": "/",
-      "dest": "/index.html"
+      "dest": "/api/$1"
     },
     {
       "src": "/main",
-      "dest": "/main.html"
+      "dest": "/main.html",
+      "headers": {
+        "Content-Type": "text/html"
+      }
     },
     {
       "src": "/(.*)",
-      "dest": "/404.html"
+      "dest": "/index.html"
     }
   ],
   "functions": {
