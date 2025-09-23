@@ -43,8 +43,10 @@
             border: none;
             cursor: pointer;
             transition: transform 0.2s;
+            position: relative;
+            overflow: hidden;
         }
-        button:hover { transform: translateY(-2px); }
+        button:hover:not(:disabled) { transform: translateY(-2px); }
         button:disabled {
             background: #ccc;
             transform: none;
@@ -52,6 +54,31 @@
         }
         .error { color: #e74c3c; margin-top: 10px; text-align: center; }
         .lock-info { color: #f39c12; margin-top: 10px; text-align: center; }
+        
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .button-text {
+            transition: opacity 0.3s;
+        }
+        
+        button.loading .button-text {
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
@@ -59,7 +86,10 @@
         <h2>🔐 日记本登录</h2>
         <form id="loginForm">
             <input type="password" id="password" placeholder="请输入访问密码" required autofocus>
-            <button type="submit" id="submitBtn">进入日记本</button>
+            <button type="submit" id="submitBtn">
+                <span class="loading-spinner" style="display: none;"></span>
+                <span class="button-text">进入日记本</span>
+            </button>
         </form>
         <div id="errorMsg" class="error"></div>
         <div id="lockInfo" class="lock-info"></div>
@@ -70,6 +100,7 @@
             constructor() {
                 this.errorCount = parseInt(localStorage.getItem('passwordErrorCount') || '0');
                 this.lockEndTime = parseInt(localStorage.getItem('passwordLockEndTime') || '0');
+                this.isSubmitting = false; // 新增：防止重复提交的标志
                 this.init();
             }
 
@@ -91,13 +122,39 @@
 
                 if (this.isLocked()) {
                     submitBtn.disabled = true;
-                    submitBtn.textContent = `🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）`;
+                    submitBtn.innerHTML = `<span class="button-text">🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）</span>`;
                     lockInfo.textContent = `密码错误3次，账户已锁定${this.getRemainingLockTime()}分钟`;
                 } else {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = '进入日记本';
+                    submitBtn.innerHTML = '<span class="button-text">进入日记本</span>';
                     lockInfo.textContent = '';
                 }
+            }
+
+            // 新增：显示加载状态
+            showLoading() {
+                const submitBtn = document.getElementById('submitBtn');
+                const spinner = submitBtn.querySelector('.loading-spinner');
+                const buttonText = submitBtn.querySelector('.button-text');
+                
+                submitBtn.disabled = true;
+                submitBtn.classList.add('loading');
+                spinner.style.display = 'inline-block';
+                buttonText.textContent = '登录中...';
+                this.isSubmitting = true;
+            }
+
+            // 新增：隐藏加载状态
+            hideLoading() {
+                const submitBtn = document.getElementById('submitBtn');
+                const spinner = submitBtn.querySelector('.loading-spinner');
+                const buttonText = submitBtn.querySelector('.button-text');
+                
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                spinner.style.display = 'none';
+                buttonText.textContent = '进入日记本';
+                this.isSubmitting = false;
             }
 
             generateSalt() {
@@ -116,14 +173,23 @@
             async handleLogin(e) {
                 e.preventDefault();
                 
+                // 防止重复提交
+                if (this.isSubmitting) {
+                    return;
+                }
+                
                 const password = document.getElementById('password').value;
                 const errorMsg = document.getElementById('errorMsg');
+                errorMsg.textContent = ''; // 清空错误信息
 
                 if (this.isLocked()) {
                     errorMsg.textContent = `账户已锁定，请${this.getRemainingLockTime()}分钟后重试`;
                     this.trackPageVisit('password_lock_attempt_while_locked');
                     return;
                 }
+
+                // 显示加载状态
+                this.showLoading();
 
                 try {
                     const salt = this.generateSalt();
@@ -149,6 +215,9 @@
                 } catch (error) {
                     errorMsg.textContent = '网络错误，请检查连接';
                     console.error('登录失败:', error);
+                } finally {
+                    // 无论成功或失败，都隐藏加载状态
+                    this.hideLoading();
                 }
             }
 
