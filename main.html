@@ -221,16 +221,19 @@
                     container.appendChild(this.createDiaryElement(diary));
                 });
 
-                if (!this.endReached) {
-                    const loadMore = document.createElement('div');
-                    loadMore.className = 'load-more';
-                    loadMore.textContent = '⬇️ 下拉加载更多';
-                    container.appendChild(loadMore);
-                } else if (this.diaries.length > 0) {
+                if (this.diaries.length > 0) {
                     const endMessage = document.createElement('div');
                     endMessage.className = 'load-more';
-                    endMessage.textContent = '🎉 已经到底啦~';
+                    
+                    if (this.endReached) {
+                        endMessage.textContent = '🎉 已经到底啦~';
+                    } else {
+                        endMessage.textContent = '⬇️ 下拉加载更多';
+                    }
+                    
                     container.appendChild(endMessage);
+                } else {
+                    container.innerHTML = '<div>📝 还没有日记，开始写第一篇吧！</div>';
                 }
             }
 
