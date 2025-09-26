@@ -224,7 +224,7 @@
                     }
                 } catch (error) {
                     errorMsg.textContent = '登录失败:', error;
-                    console.error('登录失败:', error);
+                    console.error('登录失败:' + error);
                     this.hideLoading(); // 确保在错误时也隐藏加载状态
                 }
             }
