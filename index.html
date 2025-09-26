@@ -203,8 +203,7 @@
                     const salt = this.generateSalt();
                     const hashedPassword = await this.hashPassword(password, salt);
 
-                    // 模拟网络请求延迟
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 0));
                     
                     const response = await fetch('https://pwd.m-code.top/api/diary', {
                         method: 'POST',
@@ -224,7 +223,7 @@
                         this.handleLoginFailure();
                     }
                 } catch (error) {
-                    errorMsg.textContent = '网络错误，请检查连接';
+                    errorMsg.textContent = '登录失败:', error;
                     console.error('登录失败:', error);
                     this.hideLoading(); // 确保在错误时也隐藏加载状态
                 }
