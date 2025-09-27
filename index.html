@@ -123,14 +123,17 @@
             updateUI() {
                 const submitBtn = document.getElementById('submitBtn');
                 const lockInfo = document.getElementById('lockInfo');
+                const passwordInput = document.getElementById('password');
 
                 if (this.isLocked()) {
                     submitBtn.disabled = true;
+                    passwordInput.disabled = true;
                     const buttonText = submitBtn.querySelector('.button-text');
                     buttonText.textContent = `🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）`;
                     lockInfo.textContent = `密码错误3次，账户已锁定${this.getRemainingLockTime()}分钟`;
                 } else {
                     submitBtn.disabled = false;
+                    passwordInput.disabled = false;
                     const buttonText = submitBtn.querySelector('.button-text');
                     buttonText.textContent = '进入日记本';
                     lockInfo.textContent = '';
@@ -154,10 +157,10 @@
                 const spinner = submitBtn.querySelector('.loading-spinner');
                 const buttonText = submitBtn.querySelector('.button-text');
                 
-                submitBtn.disabled = false;
+                submitBtn.disabled = this.isLocked();
                 submitBtn.classList.remove('loading');
                 spinner.style.display = 'none';
-                buttonText.textContent = '进入日记本';
+                buttonText.textContent = this.isLocked() ? `🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）` : '进入日记本';
                 this.isSubmitting = false;
             }
 
