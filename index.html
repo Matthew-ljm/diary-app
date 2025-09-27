@@ -46,16 +46,17 @@
             position: relative;
             overflow: hidden;
         }
-        button:hover:not(:disabled) { transform: translateY(-2px); }
+        button:hover:not(:disabled) { 
+            transform: translateY(-2px); 
+        }
         button:disabled {
             background: #ccc;
             transform: none;
             cursor: not-allowed;
+            opacity: 0.7;
         }
         .error { color: #e74c3c; margin-top: 10px; text-align: center; }
         .lock-info { color: #f39c12; margin-top: 10px; text-align: center; }
-        
-        /* 加载动画 */
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -67,20 +68,15 @@
             margin-right: 8px;
             vertical-align: middle;
         }
-        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-        
         .button-text {
             transition: opacity 0.3s;
         }
-        
         button.loading .button-text {
             opacity: 0.5;
         }
-        
-        /* 新增样式：确保按钮内容居中 */
         button {
             display: flex;
             align-items: center;
@@ -130,16 +126,17 @@
 
                 if (this.isLocked()) {
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = `<span class="button-text">🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）</span>`;
+                    const buttonText = submitBtn.querySelector('.button-text');
+                    buttonText.textContent = `🔒 锁定中（${this.getRemainingLockTime()}分钟后解锁）`;
                     lockInfo.textContent = `密码错误3次，账户已锁定${this.getRemainingLockTime()}分钟`;
                 } else {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<span class="loading-spinner" style="display: none;"></span><span class="button-text">进入日记本</span>';
+                    const buttonText = submitBtn.querySelector('.button-text');
+                    buttonText.textContent = '进入日记本';
                     lockInfo.textContent = '';
                 }
             }
 
-            // 显示加载状态
             showLoading() {
                 const submitBtn = document.getElementById('submitBtn');
                 const spinner = submitBtn.querySelector('.loading-spinner');
@@ -152,7 +149,6 @@
                 this.isSubmitting = true;
             }
 
-            // 隐藏加载状态
             hideLoading() {
                 const submitBtn = document.getElementById('submitBtn');
                 const spinner = submitBtn.querySelector('.loading-spinner');
@@ -181,14 +177,13 @@
             async handleLogin(e) {
                 e.preventDefault();
                 
-                // 防止重复提交
                 if (this.isSubmitting) {
                     return;
                 }
                 
                 const password = document.getElementById('password').value;
                 const errorMsg = document.getElementById('errorMsg');
-                errorMsg.textContent = ''; // 清空错误信息
+                errorMsg.textContent = '';
 
                 if (this.isLocked()) {
                     errorMsg.textContent = `账户已锁定，请${this.getRemainingLockTime()}分钟后重试`;
@@ -196,7 +191,6 @@
                     return;
                 }
 
-                // 显示加载状态
                 this.showLoading();
 
                 try {
@@ -225,7 +219,7 @@
                 } catch (error) {
                     errorMsg.textContent = '登录失败:' + error;
                     console.error('登录失败:',error);
-                    this.hideLoading(); // 确保在错误时也隐藏加载状态
+                    this.hideLoading();
                 }
             }
 
@@ -246,7 +240,6 @@
                     errorMsg.textContent = `密码错误，还剩${3 - this.errorCount}次机会`;
                 }
                 
-                // 登录失败后隐藏加载状态
                 this.hideLoading();
                 this.updateUI();
             }
